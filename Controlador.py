@@ -12,11 +12,11 @@ class Controlador:
         return str(texto).strip().lower()
 
     # ==========================================
-    # FUNCIONES DE VALIDACIÓN (El filtro estricto)
+    # FUNCIONES DE VALIDACIÓN DE DATOS
     # ==========================================
 
     def validar_placa(self, placa_cruda):
-        """Valida que la placa tenga 3 letras y 3 números y la pasa a mayúsculas."""
+        """Verifica que la placa contenga exactamente 3 letras y 3 números, retornándola en formato mayúscula."""
         placa_limpia = str(placa_cruda).replace(" ", "")
         patron_1 = r'^[A-Za-z]{3}\d{3}$'
         patron_2 = r'^\d{3}[A-Za-z]{3}$'
@@ -26,7 +26,7 @@ class Controlador:
         return None
 
     def validar_hora(self, hora_cruda):
-        """Valida que la hora sea real y esté en formato HH:MM."""
+        """Valida que la cadena de texto corresponda a una hora real bajo el formato HH:MM."""
         try:
             hora_valida = datetime.strptime(str(hora_cruda).strip(), "%H:%M")
             return hora_valida.strftime("%H:%M")
@@ -34,7 +34,7 @@ class Controlador:
             return None
 
     def validar_km(self, km_crudo):
-        """Valida que los km sean numéricos y positivos."""
+        """Valida que el valor ingresado sea numérico y corresponda a una distancia positiva."""
         try:
             km = float(km_crudo)
             if km < 0:
@@ -48,7 +48,7 @@ class Controlador:
     # ==========================================
 
     def solicitar_y_validar_datos(self):
-        """Encierra al usuario hasta que meta todos los datos como se debe."""
+        """Itera la solicitud de entrada de datos por consola hasta asegurar su validez estructural y lógica."""
         print("\n--- Ingrese los datos del vehículo ---")
         
         while True:
@@ -56,7 +56,7 @@ class Controlador:
             placa_valida = self.validar_placa(placa)
             if placa_valida:
                 break
-            self.vista.mensaje_error("Placa inválida. Recuerde: 3 letras y 3 números, sin importar el orden.")
+            self.vista.mensaje_error("Placa inválida. Recuerde ingresar exactamente 3 letras y 3 números.")
 
         conductor_crudo = self.vista.pedir_dato_vehiculo("Nombre del conductor")
         conductor = self.a_minusculas(conductor_crudo)
@@ -66,21 +66,21 @@ class Controlador:
             h_salida_valida = self.validar_hora(h_salida)
             if h_salida_valida:
                 break
-            self.vista.mensaje_error("Hora inválida. Use el formato de 24 horas (ej. 08:30).")
+            self.vista.mensaje_error("Hora inválida. Se requiere el uso del formato de 24 horas (ej. 08:30).")
 
         while True:
             km = self.vista.pedir_dato_vehiculo("Kilómetros recorridos")
             km_valido = self.validar_km(km)
             if km_valido is not None:
                 break
-            self.vista.mensaje_error("Kilómetros inválidos. Ingrese un número positivo.")
+            self.vista.mensaje_error("Kilometraje inválido. Ingrese un valor numérico positivo.")
 
         while True:
             h_llegada = self.vista.pedir_dato_vehiculo("Hora de llegada (HH:MM)")
             h_llegada_valida = self.validar_hora(h_llegada)
             if h_llegada_valida:
                 break
-            self.vista.mensaje_error("Hora inválida. Use formato HH:MM.")
+            self.vista.mensaje_error("Hora inválida. Se requiere el uso del formato HH:MM.")
 
         lote_crudo = self.vista.pedir_dato_vehiculo("Lote al que pertenece")
         lote = self.a_minusculas(lote_crudo)
@@ -94,11 +94,37 @@ class Controlador:
             "lote": lote
         }
 
+    def _verificar_conflicto_horario(self, nuevos_datos):
+        """
+        Verifica la existencia de conflictos de programación y disponibilidad.
+        Retorna True si un vehículo específico (misma placa) ya cuenta con un 
+        registro de viaje asignado a la misma hora de salida.
+        """
+        registros_actuales = self.obtener_registros_seguro()
+        
+        if not registros_actuales:
+            return False
+            
+        for v in registros_actuales:
+            if (v["camion"] == nuevos_datos["camion"] and
+                v["hora_salida"] == nuevos_datos["hora_salida"]):
+                return True 
+        return False
+
     def guardar_vehiculo_seguro(self, datos):
-        """Delega el guardado al modelo y maneja el error si el Excel está abierto."""
+        """
+        Gestiona el proceso de persistencia de datos delegando la escritura al modelo,
+        previa validación de conflictos de horario e integridad del archivo CSV.
+        """
+        if self._verificar_conflicto_horario(datos):
+            self.vista.mensaje_error("El vehículo ingresado ya tiene una ruta asignada a esa misma hora de salida.")
+            return 
+            
         exito = self.modelo.guardar_vehiculo(datos)
         if not exito:
-            self.vista.mensaje_error("No se pudo guardar. ¡Cierre el archivo CSV en Excel e intente de nuevo, baka!")
+            self.vista.mensaje_error("Error de escritura: El archivo CSV se encuentra abierto o bloqueado por otro programa. Ciérrelo e intente de nuevo.")
+        else:
+            print("\n[+] Registro almacenado exitosamente en el sistema.")
 
     # ==========================================
     # FLUJOS PRINCIPALES
