@@ -148,18 +148,24 @@ class Controlador:
     # ==========================================
 
     def flujo_registro(self):
-        """Maneja el registro de N vehículos o indefinidos."""
+        """Maneja el registro de N vehículos o de forma indefinida."""
         tipo = self.a_minusculas(self.vista.preguntar_tipo_registro())
 
         if tipo in ['1', 'n', 'definida']:
-            try:
-                n_str = self.a_minusculas(self.vista.pedir_cantidad_n())
-                n = int(n_str)
-                for _ in range(n):
-                    datos_limpios = self.solicitar_y_validar_datos()
-                    self.guardar_vehiculo_seguro(datos_limpios)
-            except ValueError:
-                self.vista.mensaje_error("Debe ingresar un número válido para la cantidad.")
+            # Nuevo bloque de validación a prueba de números negativos o ceros
+            while True:
+                try:
+                    n_str = self.a_minusculas(self.vista.pedir_cantidad_n())
+                    n = int(n_str)
+                    if n > 0:
+                        break
+                    self.vista.mensaje_error("La cantidad de vehículos a registrar debe ser un valor entero mayor a cero.")
+                except ValueError:
+                    self.vista.mensaje_error("Formato inválido. Debe ingresar un número válido para la cantidad.")
+            
+            for _ in range(n):
+                datos_limpios = self.solicitar_y_validar_datos()
+                self.guardar_vehiculo_seguro(datos_limpios)
 
         elif tipo in ['2', 'indefinida']:
             while True:
@@ -174,7 +180,7 @@ class Controlador:
             return
 
         self.manejar_salida()
-
+        
     def manejar_salida(self):
         """Submenú después de registrar para volver o matar el programa."""
         accion = self.a_minusculas(self.vista.preguntar_accion_final())
@@ -198,23 +204,26 @@ class Controlador:
         """Menú que despacha los diferentes tipos de filtros sobre el CSV."""
         while True:
             opcion = self.a_minusculas(self.vista.mostrar_menu_busqueda())
-            
-            # Primero verificamos si el usuario quiere salir, para no bloquearlo
+
             if opcion in ['6', 'volver']:
                 break
-                
+
             todos = self.obtener_registros_seguro()
-            
-            # Aquí estaba el salto fantasma. Ahora sí arroja el error formal.
+
             if not todos:
                 self.vista.mensaje_error("No existen registros en el sistema actualmente. Por favor, registre datos antes de realizar una búsqueda.")
                 continue
 
             if opcion in ['1', 'placa']:
                 placa = self.vista.pedir_dato_vehiculo("Ingrese la placa a buscar")
-                placa_limpia = placa.replace(" ", "").upper()
-                filtrados = [v for v in todos if v["camion"] == placa_limpia]
-                self.vista.mostrar_tabla_vehiculos(filtrados)
+                # Se reutiliza el validador estricto para asegurar el formato y la conversión a mayúsculas
+                placa_valida = self.validar_placa(placa)
+
+                if placa_valida:
+                    filtrados = [v for v in todos if v["camion"] == placa_valida]
+                    self.vista.mostrar_tabla_vehiculos(filtrados)
+                else:
+                    self.vista.mensaje_error("El formato de la placa buscada es inválido. Recuerde ingresar 3 letras y 3 números.")
 
             elif opcion in ['2', 'conductor']:
                 busqueda = self.a_minusculas(self.vista.pedir_dato_vehiculo("Ingrese el nombre del conductor"))
@@ -234,13 +243,13 @@ class Controlador:
 
             else:
                 self.vista.mensaje_error("Opción de búsqueda no válida.")
-                
+
     def _buscar_por_rango_km(self, registros):
         """Filtra camiones dentro de un intervalo cerrado [min_km, max_km]."""
         while True:
             min_km_str = self.vista.pedir_dato_vehiculo("Kilometraje mínimo")
             max_km_str = self.vista.pedir_dato_vehiculo("Kilometraje máximo")
-            
+
             min_km = self.validar_km(min_km_str)
             max_km = self.validar_km(max_km_str)
 

@@ -1,0 +1,6 @@
+# Ignorar la base de datos local
+registro_camiones.csv
+
+# Ignorar las basuras que genera Python automáticamente
+__pycache__/
+*.pyc
