@@ -78,9 +78,26 @@ class Controlador:
         while True:
             h_llegada = self.vista.pedir_dato_vehiculo("Hora de llegada (HH:MM)")
             h_llegada_valida = self.validar_hora(h_llegada)
+            
             if h_llegada_valida:
-                break
-            self.vista.mensaje_error("Hora inválida. Se requiere el uso del formato HH:MM.")
+                t_salida = datetime.strptime(h_salida_valida, "%H:%M").time()
+                t_llegada = datetime.strptime(h_llegada_valida, "%H:%M").time()
+                
+                # Validación de incongruencia temporal manejando viajes de múltiples días
+                if t_llegada <= t_salida:
+                    dias_str = self.vista.pedir_dato_vehiculo("La hora de llegada no es congruente para un solo día. ¿Cuántos días duró el viaje? (Ingrese 0 si se equivocó)")
+                    try:
+                        dias = int(dias_str)
+                        if dias > 0:
+                            break
+                        else:
+                            self.vista.mensaje_error("Incongruencia temporal. No es posible viajar hacia el pasado o registrar un viaje de duración cero.")
+                    except ValueError:
+                        self.vista.mensaje_error("Error de formato. Debe ingresar un número entero (ej. 1, 2, 3).")
+                else:
+                    break
+            else:
+                self.vista.mensaje_error("Hora inválida. Se requiere el uso del formato HH:MM.")
 
         lote_crudo = self.vista.pedir_dato_vehiculo("Lote al que pertenece")
         lote = self.a_minusculas(lote_crudo)
@@ -181,10 +198,16 @@ class Controlador:
         """Menú que despacha los diferentes tipos de filtros sobre el CSV."""
         while True:
             opcion = self.a_minusculas(self.vista.mostrar_menu_busqueda())
+            
+            # Primero verificamos si el usuario quiere salir, para no bloquearlo
+            if opcion in ['6', 'volver']:
+                break
+                
             todos = self.obtener_registros_seguro()
             
-            # Si la lista de todos viene vacía y la opción no es salir, vuelve a preguntar
-            if not todos and opcion not in ['6', 'volver']:
+            # Aquí estaba el salto fantasma. Ahora sí arroja el error formal.
+            if not todos:
+                self.vista.mensaje_error("No existen registros en el sistema actualmente. Por favor, registre datos antes de realizar una búsqueda.")
                 continue
 
             if opcion in ['1', 'placa']:
@@ -209,11 +232,9 @@ class Controlador:
             elif opcion in ['5', 'tiempo', 'hora']:
                 self._buscar_por_lapso_tiempo(todos)
 
-            elif opcion in ['6', 'volver']:
-                break
             else:
                 self.vista.mensaje_error("Opción de búsqueda no válida.")
-
+                
     def _buscar_por_rango_km(self, registros):
         """Filtra camiones dentro de un intervalo cerrado [min_km, max_km]."""
         while True:
